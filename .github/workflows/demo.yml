@@ -1,0 +1,54 @@
+name: Publish Faith frontend Docker Image to AWS ECR
+on:
+  push:
+    branches-ignore:
+      - "**"
+    tags:
+      - "faith_frontend@v*"
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY_NAME: faith-frontend
+
+jobs:
+  build-publish-faith-frontend:
+    name: Build and Push Faith frontend Docker Image to AWS ECR
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Set Tag Prefix
+      run: |
+        # Extract the value after '@' from the tag
+        TAG=$(echo $GITHUB_REF | sed -e 's|refs/tags/faith_frontend@||')
+        echo "IMAGE_TAG_PREFIX=$TAG" >> $GITHUB_ENV
+
+    - name: Compute Timestamp
+      run: |
+        TIMESTAMP=$(date -u +"%Y%m%d%H%M%S")
+        echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
+
+    - name: Echo Tag Prefix and Timestamp
+      run: |
+        echo "Tag Prefix: ${{ env.IMAGE_TAG_PREFIX }}"
+        echo "Timestamp: ${{ env.TIMESTAMP }}"
+
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Build Docker image
+      run: |
+        # Build the Docker image
+        docker build -t faith-frontend:latest .
+
+    - name: Login to AWS ECR
+      run: |
+        aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+
+    - name: Tag Docker Image
+      run: |
+        # Tag the Docker image using the extracted prefix and timestamp
+        docker tag faith-frontend:latest <AWS_ACCOUNT_ID>.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_NAME }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.TIMESTAMP }}
+
+    - name: Push Docker image to AWS ECR
+      run: |
+        # Push the tagged image to AWS ECR
+        docker push <AWS_ACCOUNT_ID>.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_NAME }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.TIMESTAMP }}
